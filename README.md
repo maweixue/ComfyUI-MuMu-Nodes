@@ -6,7 +6,7 @@
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/maweixue/ComfyUI-MuMu-Nodes.git
+git clone https://github.com/ntmvqd5/ComfyUI-MuMu-Nodes.git
 ```
 
 重启 ComfyUI 后即可使用。
