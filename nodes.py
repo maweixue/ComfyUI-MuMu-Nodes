@@ -61,12 +61,12 @@ BANANA_ASPECT_CHOICES = ["1:1", "16:9", "9:16", "4:3", "3:4",
 BANANA_ASPECT_CHOICES_EDIT = ["auto"] + BANANA_ASPECT_CHOICES
 
 _SERIES_MODEL = {
-    "banana_v2": {
+    _dec("YmFuYW5hX3Yy"): {
         "1K": _dec("Z2VtaW5pLTMuMS1mbGFzaC1pbWFnZS1wcmV2aWV3LTFr"),
         "2K": _dec("Z2VtaW5pLTMuMS1mbGFzaC1pbWFnZS1wcmV2aWV3LTJr"),
         "4K": _dec("Z2VtaW5pLTMuMS1mbGFzaC1pbWFnZS1wcmV2aWV3LTRr"),
     },
-    "banana_pro": {
+    _dec("YmFuYW5hX3Bybw=="): {
         "1K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctMWs="),
         "2K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctMms="),
         "4K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctNGs="),
@@ -356,7 +356,7 @@ class _Text2Image:
     RETURN_NAMES = ("图片",)
     FUNCTION = "generate"
     CATEGORY = CATEGORY
-    SERIES = "banana_v2"
+    SERIES = _dec("YmFuYW5hX3Yy")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -404,22 +404,22 @@ class _Image2Image(_Text2Image):
 
 
 class NineWanLiPlugin2(_Text2Image):
-    SERIES = "banana_v2"
+    SERIES = _dec("YmFuYW5hX3Yy")
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin2_1(_Image2Image):
-    SERIES = "banana_v2"
+    SERIES = _dec("YmFuYW5hX3Yy")
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin3(_Text2Image):
-    SERIES = "banana_pro"
+    SERIES = _dec("YmFuYW5hX3Bybw==")
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin3_1(_Image2Image):
-    SERIES = "banana_pro"
+    SERIES = _dec("YmFuYW5hX3Bybw==")
     DESCRIPTION = "测试节点 请勿使用"
 
 
@@ -645,6 +645,8 @@ def _br_poll_task(tid, api_key, timeout):
             friendly = _categorize_text(msg)
             if friendly:
                 raise RuntimeError(friendly)
+            if msg:
+                raise RuntimeError(MSG_GENERIC + "（" + str(msg).strip()[:100] + "）")
             raise RuntimeError(MSG_GENERIC)
         time.sleep(5)
 
@@ -713,33 +715,36 @@ def _img_generate(base_url, model, prompt, size, quality, api_key, seed=-1, time
     raise last if last else RuntimeError(MSG_GENERIC)
 
 
-def _br_generate(model, prompt, size, quality, api_key, seed=-1, timeout=240):
+def _br_generate(model, prompt, size, quality, api_key, seed=-1, timeout=360):
     url = _BR_BASE_URL + "/v1/images/generations/async"
     headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
-    deadline = time.time() + timeout
     last = None
     for extra in _br_build_variants(quality, seed):
         body = {"model": model, "prompt": prompt, "n": 1, "size": size, "output_format": "png",
                 "moderation": "low"}
         body.update(extra)
-        try:
-            data = _br_submit(url, body, headers, min(30, max(5, deadline - time.time())))
-        except _ReadError:
-            raise
-        except RuntimeError as e:
-            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+        for attempt in range(2):
+            try:
+                data = _br_submit(url, body, headers, 30)
+            except _ReadError:
                 raise
-            last = e
-            continue
-        tid = data.get("taskID")
-        if not tid:
-            raise RuntimeError(MSG_GENERIC)
-        try:
-            img_url = _br_poll_task(tid, api_key, deadline - time.time())
-        except BaseException:
-            _br_cancel(tid, api_key)
-            raise
-        return _br_download_retry(img_url, deadline - time.time())
+            except RuntimeError as e:
+                if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                    raise
+                last = e
+                break
+            tid = data.get("taskID")
+            if not tid:
+                raise RuntimeError(MSG_GENERIC)
+            try:
+                img_url = _br_poll_task(tid, api_key, timeout)
+            except RuntimeError as e:
+                _br_cancel(tid, api_key)
+                if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                    raise
+                last = e
+                continue
+            return _br_download_retry(img_url, 240)
     raise last if last else RuntimeError(MSG_GENERIC)
 
 
@@ -771,39 +776,86 @@ def _img_edits(base_url, model, prompt, size, quality, ref_items, api_key, seed=
     raise last if last else RuntimeError(MSG_GENERIC)
 
 
-def _br_edits(model, prompt, size, quality, ref_items, api_key, seed=-1, timeout=240):
+def _br_edits(model, prompt, size, quality, ref_items, api_key, seed=-1, timeout=360):
     url = _BR_BASE_URL + "/v1/images/edits/async"
     headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
-    deadline = time.time() + timeout
     last = None
     for extra in _br_build_variants(quality, seed):
         body = {"model": model, "prompt": prompt, "n": 1, "size": size, "output_format": "png",
                 "moderation": "low"}
         body["images"] = [_img_bytes_to_data_url(_compress(b)) for n, b in ref_items]
         body.update(extra)
-        try:
-            data = _br_submit(url, body, headers, min(30, max(5, deadline - time.time())))
-        except _ReadError:
-            raise
-        except RuntimeError as e:
-            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+        for attempt in range(2):
+            try:
+                data = _br_submit(url, body, headers, 30)
+            except _ReadError:
                 raise
-            last = e
-            continue
-        tid = data.get("taskID")
-        if not tid:
-            raise RuntimeError(MSG_GENERIC)
-        try:
-            img_url = _br_poll_task(tid, api_key, deadline - time.time())
-        except BaseException:
-            _br_cancel(tid, api_key)
-            raise
-        return _br_download_retry(img_url, deadline - time.time())
+            except RuntimeError as e:
+                if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                    raise
+                last = e
+                break
+            tid = data.get("taskID")
+            if not tid:
+                raise RuntimeError(MSG_GENERIC)
+            try:
+                img_url = _br_poll_task(tid, api_key, timeout)
+            except RuntimeError as e:
+                _br_cancel(tid, api_key)
+                if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                    raise
+                last = e
+                continue
+            return _br_download_retry(img_url, 240)
     raise last if last else RuntimeError(MSG_GENERIC)
 
 
 def _sm_edits(model, prompt, size, ref_items, api_key, seed=-1, timeout=240):
     return _img_edits(_BASE_URL, model, prompt, size, None, ref_items, api_key, seed=seed, timeout=timeout, response_format=None)
+
+
+def _ref_size(t):
+    s = list(t.shape)
+    if len(s) == 4:
+        h, w = int(s[1]), int(s[2])
+    elif len(s) == 3:
+        h, w = int(s[0]), int(s[1])
+    else:
+        return 1024, 1024
+    return max(16, w), max(16, h)
+
+
+def _auto_size(w, h):
+    w, h = int(w), int(h)
+    ratio = w / float(h)
+    if ratio >= 1.0:
+        W, H = 3840, int(3840 / ratio)
+    else:
+        W, H = int(3840 * ratio), 3840
+    if W / float(H) > 3.0:
+        if W >= H:
+            H = int(W / 3.0)
+        else:
+            W = int(H / 3.0)
+    pix = W * H
+    if pix > 8294400:
+        s = (8294400.0 / pix) ** 0.5
+        W, H = int(W * s), int(H * s)
+    elif pix < 655360:
+        s = (655360.0 / pix) ** 0.5
+        W, H = int(W * s), int(H * s)
+    W = max(16, (W // 16) * 16)
+    H = max(16, (H // 16) * 16)
+    pix = W * H
+    if pix > 8294400:
+        s = (8294400.0 / pix) ** 0.5
+        W = max(16, (int(W * s) // 16) * 16)
+        H = max(16, (int(H * s) // 16) * 16)
+    if pix < 655360:
+        s = (655360.0 / pix) ** 0.5
+        W = max(16, (int(W * s) // 16) * 16 + 16)
+        H = max(16, (int(H * s) // 16) * 16 + 16)
+    return "%dx%d" % (W, H)
 
 
 class _BRText2Image:
@@ -866,12 +918,19 @@ class _BRImage2Image(_BRText2Image):
 
     def generate(self, api_key, resolution, aspect, seed=-1, model_version=None, quality=None, prompt="", **kwargs):
         model, q, res = self._resolve_cfg(model_version, quality, resolution)
-        size = self.SIZES[res][aspect]
         imgs = [kwargs.get(k) for k in _IMAGE_KEYS]
         slots = {i + 1: imgs[i] for i in range(10) if imgs[i] is not None}
         if not slots:
+            if aspect == "auto":
+                aspect = "1:1"
+            size = self.SIZES[res][aspect]
             tensors = _br_generate(model, prompt, size, q, api_key, seed=seed)
         else:
+            if aspect == "auto":
+                w, h = _ref_size(next(iter(slots.values())))
+                size = _auto_size(w, h)
+            else:
+                size = self.SIZES[res][aspect]
             ref_items = [(n, _img_tensor_to_bytes(val)[0]) for n, val in sorted(slots.items())]
             tensors = _br_edits(model, prompt, size, q, ref_items, api_key, seed=seed)
         return (_pack_output(tensors),)
@@ -930,12 +989,19 @@ class _SMImage2Image(_SMText2Image):
         return {"required": required, "optional": optional}
 
     def generate(self, api_key, resolution, aspect, seed=-1, prompt="", **kwargs):
-        size = _BR_SIZES[resolution][aspect]
         imgs = [kwargs.get(k) for k in _IMAGE_KEYS]
         slots = {i + 1: imgs[i] for i in range(10) if imgs[i] is not None}
         if not slots:
+            if aspect == "auto":
+                aspect = "1:1"
+            size = _BR_SIZES[resolution][aspect]
             tensors = _sm_generate(self.MODEL, prompt, size, api_key, seed=seed)
         else:
+            if aspect == "auto":
+                w, h = _ref_size(next(iter(slots.values())))
+                size = _auto_size(w, h)
+            else:
+                size = _BR_SIZES[resolution][aspect]
             ref_items = [(n, _img_tensor_to_bytes(val)[0]) for n, val in sorted(slots.items())]
             tensors = _sm_edits(self.MODEL, prompt, size, ref_items, api_key, seed=seed)
         return (_pack_output(tensors),)
