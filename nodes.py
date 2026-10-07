@@ -32,7 +32,7 @@ try:
 except ImportError:
     Image = None
 
-_BASE_URL = _dec("aHR0cHM6Ly9hcGkuc21pbGUtYWktc3R1ZGlvLmNvbQ==")
+_BASE_URL = "https://api.smile-ai-studio.com"
 
 MSG_VIOLATION = "内容违规，可能涉嫌色情内容，请修改图片或提示词后重新生成"
 MSG_SIZE_TOO_LARGE = "图片尺寸太大 AI无法承载 请将最长边分辨率调整到6500像素以下"
@@ -61,22 +61,22 @@ BANANA_ASPECT_CHOICES = ["1:1", "16:9", "9:16", "4:3", "3:4",
 BANANA_ASPECT_CHOICES_EDIT = ["auto"] + BANANA_ASPECT_CHOICES
 
 _SERIES_MODEL = {
-    _dec("YmFuYW5hX3Yy"): {
-        "1K": _dec("Z2VtaW5pLTMuMS1mbGFzaC1pbWFnZS1wcmV2aWV3LTFr"),
-        "2K": _dec("Z2VtaW5pLTMuMS1mbGFzaC1pbWFnZS1wcmV2aWV3LTJr"),
-        "4K": _dec("Z2VtaW5pLTMuMS1mbGFzaC1pbWFnZS1wcmV2aWV3LTRr"),
+    "banana_v2": {
+        "1K": "gemini-3.1-flash-image-preview-1k",
+        "2K": "gemini-3.1-flash-image-preview-2k",
+        "4K": "gemini-3.1-flash-image-preview-4k",
     },
-    _dec("YmFuYW5hX3Bybw=="): {
-        "1K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctMWs="),
-        "2K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctMms="),
-        "4K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctNGs="),
+    "banana_pro": {
+        "1K": "gemini-3-pro-image-preview-1k",
+        "2K": "gemini-3-pro-image-preview-2k",
+        "4K": "gemini-3-pro-image-preview-4k",
     },
-    _dec("YmFuYW5hX3YyMQ=="): {
-        "4K": _dec("Z2VtaW5pLW5hbm8tYmFuYW5hLTIuMS00aw=="),
+    "banana_v21": {
+        "4K": "gemini-nano-banana-2.1-4k",
     },
 }
 
-_BR_BASE_URL = _dec("aHR0cHM6Ly9hcGkuYmFuYW5hcm91dGVyLmNvbQ==")
+_BR_BASE_URL = "https://api.bananarouter.com"
 _BR_SIZES = {
     "1K": {"auto": "1024x1024", "1:1": "1024x1024", "16:9": "1536x864",
             "9:16": "864x1536", "4:3": "1360x1024", "3:4": "1024x1360",
@@ -360,7 +360,7 @@ class _Text2Image:
     RETURN_NAMES = ("图片",)
     FUNCTION = "generate"
     CATEGORY = CATEGORY
-    SERIES = _dec("YmFuYW5hX3Yy")
+    SERIES = "banana_v2"
     RESOLUTIONS = RESOLUTION_CHOICES
     ASPECTS = BANANA_ASPECT_CHOICES
     ASPECTS_EDIT = BANANA_ASPECT_CHOICES_EDIT
@@ -412,33 +412,33 @@ class _Image2Image(_Text2Image):
 
 
 class NineWanLiPlugin2(_Text2Image):
-    SERIES = _dec("YmFuYW5hX3Yy")
+    SERIES = "banana_v2"
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin2_1(_Image2Image):
-    SERIES = _dec("YmFuYW5hX3Yy")
+    SERIES = "banana_v2"
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin3(_Text2Image):
-    SERIES = _dec("YmFuYW5hX3Bybw==")
+    SERIES = "banana_pro"
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin3_1(_Image2Image):
-    SERIES = _dec("YmFuYW5hX3Bybw==")
+    SERIES = "banana_pro"
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPluginV2(_Text2Image):
-    SERIES = _dec("YmFuYW5hX3YyMQ==")
+    SERIES = "banana_v21"
     RESOLUTIONS = ["4K"]
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPluginV2_1(_Image2Image):
-    SERIES = _dec("YmFuYW5hX3YyMQ==")
+    SERIES = "banana_v21"
     RESOLUTIONS = ["4K"]
     DESCRIPTION = "测试节点 请勿使用"
 
@@ -866,38 +866,38 @@ def _int_or(v, d):
 def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality="4", no="", iw=None):
     p = (prompt or "")[:900]
     if aspect and aspect != "auto":
-        p += _dec("IC0tYXIg") + aspect
+        p += " --ar " + aspect
     if stylize is not None and str(stylize).strip() != "不设置":
-        p += _dec("IC0tc3R5bGl6ZSA=") + str(_int_or(stylize, 100))
+        p += " --stylize " + str(_int_or(stylize, 100))
     if seed is not None and str(seed).strip() and str(seed).strip() != "不设置":
         sd = _int_or(seed, -1)
         if sd >= 0:
             sd &= 0xFFFFFFFF
-            p += _dec("IC0tc2VlZCA=") + str(sd)
+            p += " --seed " + str(sd)
     if chaos is not None and str(chaos).strip() and str(chaos).strip() != "不设置":
         c = _int_or(chaos, 0)
         if c > 0:
-            p += _dec("IC0tY2hhb3Mg") + str(c)
+            p += " --chaos " + str(c)
     if quality and quality != "不设置":
-        p += _dec("IC0tcSA=") + quality
+        p += " --q " + quality
     if no and str(no).strip() and str(no).strip() != "不设置":
-        p += _dec("IC0tbm8g") + str(no).strip()
+        p += " --no " + str(no).strip()
     if iw is not None and str(iw).strip() and str(iw).strip() != "不设置":
         try:
             f = float(iw)
             if f >= 0:
-                p += _dec("IC0taXcg") + str(f)
+                p += " --iw " + str(f)
         except Exception:
             pass
     return p
 
 
 def _mj_submit(prompt, api_key, ref_b64=None):
-    url = _BR_BASE_URL + _dec("L21qL3N1Ym1pdC9pbWFnaW5l")
+    url = _BR_BASE_URL + "/mj/submit/imagine"
     headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
-    body = {"model": _dec("bWlkam91cm5leQ=="), "prompt": prompt}
+    body = {"model": "midjourney", "prompt": prompt}
     if ref_b64:
-        body[_dec("YmFzZTY0QXJyYXk=")] = ref_b64
+        body["base64Array"] = ref_b64
     try:
         raw = _request(url, json.dumps(body).encode("utf-8"), headers, 30)
     except _ReadError:
@@ -915,7 +915,7 @@ def _mj_submit(prompt, api_key, ref_b64=None):
 
 
 def _mj_poll(tid, api_key, timeout):
-    url = _BR_BASE_URL + _dec("L21qL3Rhc2sv") + tid + "/fetch"
+    url = _BR_BASE_URL + "/mj/task/" + tid + "/fetch"
     headers = {"Authorization": "Bearer " + api_key}
     deadline = time.time() + timeout
     while True:
@@ -1153,14 +1153,14 @@ class _BRImage2Image(_BRText2Image):
 
 
 class NineWanLiPlugin5(_BRText2Image):
-    MODEL = _dec("Z3B0LWltYWdlLTIuNS1mbGFyZQ==")
+    MODEL = "gpt-image-2.5-flare"
     RESOLUTIONS = RESOLUTION_CHOICES_NO_1K
     QUALITY_FIXED = "max"
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin5_1(_BRImage2Image):
-    MODEL = _dec("Z3B0LWltYWdlLTIuNS1mbGFyZQ==")
+    MODEL = "gpt-image-2.5-flare"
     RESOLUTIONS = RESOLUTION_CHOICES_NO_1K
     QUALITY_FIXED = "max"
     DESCRIPTION = "测试节点 请勿使用"
@@ -1224,25 +1224,25 @@ class _SMImage2Image(_SMText2Image):
 
 
 class NineWanLiPlugin6(_SMText2Image):
-    MODEL = _dec("Z3B0LWltYWdlLTI=")
+    MODEL = "gpt-image-2"
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin6_1(_SMImage2Image):
-    MODEL = _dec("Z3B0LWltYWdlLTI=")
+    MODEL = "gpt-image-2"
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin7(_SMText2Image):
-    MODEL = _dec("Z3B0LWltYWdlLTIuNS1mbGFyZQ==")
+    MODEL = "gpt-image-2.5-flare"
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin7_1(_SMImage2Image):
-    MODEL = _dec("Z3B0LWltYWdlLTIuNS1mbGFyZQ==")
+    MODEL = "gpt-image-2.5-flare"
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
@@ -1351,10 +1351,10 @@ class NineWanLiPlugin5_6:
             content = parts
         else:
             content = prompt or ""
-        url = _BR_BASE_URL + _dec("L3YxL2NoYXQvY29tcGxldGlvbnM=")
+        url = _BR_BASE_URL + "/v1/chat/completions"
         headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
         body = {
-            "model": _dec("Z3B0LTUuNi1sdW5h"),
+            "model": "gpt-5.6-luna",
             "messages": [{"role": "user", "content": content}],
             "temperature": 0.6,
             "max_completion_tokens": 4096,
@@ -1422,4 +1422,443 @@ for _cls in [NineWanLiPlugin2, NineWanLiPlugin2_1, NineWanLiPlugin3, NineWanLiPl
              NineWanLiPlugin5, NineWanLiPlugin5_1, NineWanLiPlugin6, NineWanLiPlugin6_1,
              NineWanLiPlugin7, NineWanLiPlugin7_1, NineWanLiPluginV2, NineWanLiPluginV2_1,
              NineWanLiPluginV8, NineWanLiPluginV8_1, NineWanLiPlugin5_6]:
+    _cls.NODE_NAME = NODE_DISPLAY_NAME_MAPPINGS.get(_cls.__name__, _cls.__name__)
+
+_GR_BASE_URL = _dec("Imh0dHBzOi8vZ3JzYWkuZGFra2EuY29tLmNuIg==")
+
+_GR_ASPECTS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21"]
+_GR_ASPECTS_WIDE = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "4:1", "1:4", "8:1", "1:8"]
+_GR_ASPECTS_EDIT = ["auto"] + _GR_ASPECTS
+_GR_ASPECTS_WIDE_EDIT = ["auto"] + _GR_ASPECTS_WIDE
+
+_GR_GPT_STD = {
+    "1:1": "1024x1024", "16:9": "1672x941", "9:16": "941x1672",
+    "4:3": "1443x1090", "3:4": "1090x1443", "3:2": "1536x1024",
+    "2:3": "1024x1536", "5:4": "1408x1120", "4:5": "1120x1408",
+    "21:9": "1920x832", "9:21": "832x1920", "2:1": "1792x896", "1:2": "896x1792",
+}
+
+_GR_GPT_VIP = {
+    "1K": {
+        "1:1": "1024x1024", "16:9": "1280x720", "9:16": "720x1280",
+        "4:3": "1152x864", "3:4": "864x1152", "3:2": "1536x1024", "2:3": "1024x1536",
+        "5:4": "1120x896", "4:5": "896x1120", "21:9": "1456x624", "9:21": "624x1456",
+        "2:1": "1536x768", "1:2": "768x1536",
+    },
+    "2K": {
+        "1:1": "2048x2048", "16:9": "2048x1152", "9:16": "1152x2048",
+        "4:3": "2304x1728", "3:4": "1728x2304", "3:2": "2048x1360", "2:3": "1360x2048",
+        "5:4": "2240x1792", "4:5": "1792x2240", "21:9": "2912x1248", "9:21": "1248x2912",
+        "2:1": "3072x1536", "1:2": "1536x3072", "3:1": "2048x688", "1:3": "688x2048",
+    },
+    "4K": {
+        "1:1": "2880x2880", "16:9": "3840x2160", "9:16": "2160x3840",
+        "4:3": "3264x2448", "3:4": "2448x3264", "3:2": "3504x2336", "2:3": "2336x3504",
+        "5:4": "3200x2560", "4:5": "2560x3200", "21:9": "3840x1648", "9:21": "1648x3840",
+        "2:1": "3840x1920", "1:2": "1920x3840", "3:1": "3840x1280", "1:3": "1280x3840",
+    },
+}
+
+
+def _gr_req(method, path, api_key, data=None, params=None, timeout=120):
+    url = _GR_BASE_URL + path
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    body = json.dumps(data).encode("utf-8") if data is not None else None
+    req = urllib.request.Request(url, data=body,
+                                 headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
+                                 method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:
+        text = e.read().decode("utf-8", "ignore")
+        friendly = _categorize_text(text)
+        if friendly:
+            raise RuntimeError(friendly)
+        raise RuntimeError(MSG_GENERIC)
+    except (socket.timeout, TimeoutError):
+        raise RuntimeError(MSG_TIMEOUT)
+    except http.client.IncompleteRead:
+        raise _ReadError(MSG_TIMEOUT)
+    except urllib.error.URLError:
+        raise RuntimeError(MSG_TIMEOUT)
+    except ConnectionError:
+        raise RuntimeError(MSG_GENERIC)
+    except http.client.HTTPException:
+        raise RuntimeError(MSG_GENERIC)
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise RuntimeError(MSG_GENERIC)
+
+
+def _gr_submit(model, prompt, api_key, ar=None, image_size=None, quality=None, images=None, seed=None, timeout=60):
+    payload = {"model": model, "prompt": prompt, _dec("InJlcGx5VHlwZSI="): _dec("ImFzeW5jIg==")}
+    if ar:
+        payload[_dec("ImFzcGVjdFJhdGlvIg==")] = ar
+    if image_size:
+        payload[_dec("ImltYWdlU2l6ZSI=")] = image_size
+    if quality:
+        payload["quality"] = quality
+    if images:
+        payload["images"] = images
+    if seed is not None and int(seed) >= 0:
+        payload["seed"] = int(seed)
+    resp = _gr_req("POST", _dec("Ii92MS9hcGkvZ2VuZXJhdGUi"), api_key, payload, timeout=timeout)
+    tid = resp.get("id")
+    if not tid:
+        raise RuntimeError(MSG_GENERIC)
+    return tid
+
+
+def _gr_poll(tid, api_key, timeout):
+    deadline = time.time() + timeout
+    while True:
+        remain = deadline - time.time()
+        if remain <= 0:
+            raise RuntimeError(MSG_TIMEOUT)
+        try:
+            data = _gr_req("GET", _dec("Ii92MS9hcGkvcmVzdWx0Ig=="), api_key, params={"id": tid}, timeout=min(30, max(10, remain)))
+        except Exception:
+            time.sleep(3)
+            continue
+        st = data.get("status", "")
+        if st == _dec("InN1Y2NlZWRlZCI="):
+            urls = [x.get("url") for x in (data.get(_dec("InJlc3VsdHMi")) or []) if isinstance(x, dict) and x.get("url")]
+            if not urls:
+                raise RuntimeError(MSG_GENERIC)
+            return urls
+        if st in ("failed", _dec("InZpb2xhdGlvbiI="), _dec("ImNhbmNlbGxlZCI="), _dec("ImNhbmNlbGVkIg==")):
+            reason = str(data.get(_dec("ImZhaWx1cmVfcmVhc29uIg==")) or "")
+            if _dec("Im1vZGVyYXRpb24i") in reason or st == _dec("InZpb2xhdGlvbiI="):
+                raise RuntimeError(MSG_VIOLATION)
+            msg = data.get("error") or ""
+            if msg:
+                raise RuntimeError(MSG_GENERIC + "（" + str(msg).strip()[:100] + "）")
+            raise RuntimeError(MSG_GENERIC)
+        time.sleep(2)
+
+
+def _gr_fetch_image(url, timeout):
+    last = None
+    try:
+        return _br_download(url, timeout, 1, None)
+    except RuntimeError as e:
+        last = e
+    try:
+        return _br_download(url, timeout, 8, None)
+    except RuntimeError as e:
+        last = e
+    for proxy in _sys_proxy():
+        try:
+            return _br_download(url, timeout, 8, proxy)
+        except RuntimeError as e:
+            last = e
+    raise last if last else RuntimeError(MSG_GENERIC)
+
+
+def _gr_fetch_images(urls, timeout):
+    outs = [None] * len(urls)
+
+    def _w(i):
+        outs[i] = _gr_fetch_image(urls[i], timeout)
+
+    threads = [threading.Thread(target=_w, args=(i,)) for i in range(len(urls))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if any(o is None for o in outs):
+        raise RuntimeError(MSG_GENERIC)
+    return [_bytes_to_img_tensor(o) for o in outs]
+
+
+def _gr_generate(model, prompt, api_key, ar=None, image_size=None, quality=None, seed=None, timeout=360):
+    last = None
+    for attempt in range(2):
+        try:
+            tid = _gr_submit(model, prompt, api_key, ar, image_size, quality, None, seed)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            break
+        try:
+            urls = _gr_poll(tid, api_key, timeout)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            continue
+        try:
+            return _gr_fetch_images(urls, 240)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            last = e
+            continue
+    raise last if last else RuntimeError(MSG_GENERIC)
+
+
+def _gr_edits(model, prompt, api_key, ar, image_size, quality, ref_items, seed=None, timeout=360):
+    images = [base64.b64encode(b).decode("ascii") for n, b in ref_items]
+    last = None
+    for attempt in range(2):
+        try:
+            tid = _gr_submit(model, prompt, api_key, ar, image_size, quality, images, seed)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            break
+        try:
+            urls = _gr_poll(tid, api_key, timeout)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            continue
+        try:
+            return _gr_fetch_images(urls, 240)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            last = e
+            continue
+    raise last if last else RuntimeError(MSG_GENERIC)
+
+
+def _gr_nearest_ratio(w, h, choices):
+    if h <= 0:
+        return choices[0]
+    best = choices[0]
+    bd = 1e18
+    r = w / float(h)
+    for a in choices:
+        if ":" not in a:
+            continue
+        aw, ah = map(int, a.split(":"))
+        d = abs(r - aw / float(ah))
+        if d < bd:
+            bd = d
+            best = a
+    return best
+
+
+def _gr_nearest_pixel(w, h, table):
+    if h <= 0:
+        return next(iter(table.values()))
+    best = None
+    bd = 1e18
+    r = w / float(h)
+    for label, px in table.items():
+        if ":" not in label:
+            continue
+        aw, ah = map(int, label.split(":"))
+        d = abs(r - aw / float(ah))
+        if d < bd:
+            bd = d
+            best = px
+    return best or next(iter(table.values()))
+
+
+class _GRText2Image:
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("图片",)
+    FUNCTION = "generate"
+    CATEGORY = CATEGORY
+    MODEL = None
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS
+    ASPECTS_EDIT = _GR_ASPECTS_EDIT
+    GPT_PIXELS = None
+    QUALITY_FIXED = None
+    DESCRIPTION = "测试节点 请勿使用"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        required = {
+            "api_key": ("STRING", {"default": "", "multiline": False, "display": "密钥"}),
+            "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
+        }
+        if len(cls.RESOLUTIONS) > 1:
+            required["resolution"] = (cls.RESOLUTIONS, {"default": cls.RESOLUTIONS[0], "display": "分辨率"})
+        required["aspect"] = (cls.ASPECTS, {"default": "1:1", "display": "宽高比"})
+        required["seed"] = _seed_widget()
+        return {"required": required}
+
+    def _build(self, resolution, aspect):
+        if self.GPT_PIXELS:
+            res = resolution or "1K"
+            table = self.GPT_PIXELS.get(res) or next(iter(self.GPT_PIXELS.values()))
+            ar = table.get(aspect)
+            if not ar:
+                ar = next(iter(table.values()))
+            return None, ar
+        return resolution, aspect
+
+    def generate(self, api_key, prompt, aspect, seed=-1, resolution=None):
+        image_size, ar = self._build(resolution, aspect)
+        tensors = _gr_generate(self.MODEL, prompt, api_key, ar, image_size, self.QUALITY_FIXED, seed)
+        return (_pack_output(tensors),)
+
+
+class _GRImage2Image(_GRText2Image):
+    @classmethod
+    def INPUT_TYPES(cls):
+        base = super().INPUT_TYPES()
+        required = {k: v for k, v in base["required"].items() if k not in ("prompt", "aspect")}
+        required["aspect"] = (cls.ASPECTS_EDIT, {"default": "auto", "display": "宽高比"})
+        optional = {
+            "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
+        }
+        for i in range(1, 11):
+            optional["image_%d" % i] = ("IMAGE", {"display": "图%d" % i})
+        return {"required": required, "optional": optional}
+
+    def generate(self, api_key, aspect, seed=-1, prompt="", resolution=None, **kwargs):
+        imgs = [kwargs.get(k) for k in _IMAGE_KEYS]
+        slots = {i + 1: imgs[i] for i in range(10) if imgs[i] is not None}
+        image_size, ar = self._build(resolution, aspect)
+        if not slots:
+            if aspect == "auto":
+                if self.GPT_PIXELS:
+                    table = self.GPT_PIXELS.get(image_size or "1K") or next(iter(self.GPT_PIXELS.values()))
+                    ar = next(iter(table.values()))
+                else:
+                    ar = "1:1"
+            tensors = _gr_generate(self.MODEL, prompt, api_key, ar, image_size, self.QUALITY_FIXED, seed)
+        else:
+            w, h = _ref_size(next(iter(slots.values())))
+            if aspect == "auto":
+                if self.GPT_PIXELS:
+                    table = self.GPT_PIXELS.get(image_size or "1K") or next(iter(self.GPT_PIXELS.values()))
+                    ar = _gr_nearest_pixel(w, h, table)
+                else:
+                    ar = _gr_nearest_ratio(w, h, self.ASPECTS)
+            ref_items = [(n, _img_tensor_to_bytes(val)[0]) for n, val in sorted(slots.items())]
+            tensors = _gr_edits(self.MODEL, prompt, api_key, ar, image_size, self.QUALITY_FIXED, ref_items, seed)
+        return (_pack_output(tensors),)
+
+
+class NineWanLiPluginM1(_GRText2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLTItbGl0ZSI=")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS
+
+
+class NineWanLiPluginM1_1(_GRImage2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLTItbGl0ZSI=")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS
+
+
+class NineWanLiPluginM3(_GRText2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLXBybyI=")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS
+
+
+class NineWanLiPluginM3_1(_GRImage2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLXBybyI=")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS
+
+
+class NineWanLiPluginM4(_GRText2Image):
+    MODEL = _dec("ImdwdC1pbWFnZS0yIg==")
+    RESOLUTIONS = ["1K"]
+    ASPECTS = list(_GR_GPT_STD)
+    GPT_PIXELS = {"1K": _GR_GPT_STD}
+
+
+class NineWanLiPluginM4_1(_GRImage2Image):
+    MODEL = _dec("ImdwdC1pbWFnZS0yIg==")
+    RESOLUTIONS = ["1K"]
+    ASPECTS = list(_GR_GPT_STD)
+    GPT_PIXELS = {"1K": _GR_GPT_STD}
+
+
+class NineWanLiPluginM5(_GRText2Image):
+    MODEL = _dec("ImdwdC1pbWFnZS0yLjUtZmxhcmUi")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = list(_GR_GPT_VIP["1K"])
+    GPT_PIXELS = _GR_GPT_VIP
+    QUALITY_FIXED = "high"
+
+
+class NineWanLiPluginM5_1(_GRImage2Image):
+    MODEL = _dec("ImdwdC1pbWFnZS0yLjUtZmxhcmUi")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = list(_GR_GPT_VIP["1K"])
+    GPT_PIXELS = _GR_GPT_VIP
+    QUALITY_FIXED = "high"
+
+
+class NineWanLiPluginM6(_GRText2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLTIuMSI=")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS_WIDE
+
+
+class NineWanLiPluginM6_1(_GRImage2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLTIuMSI=")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS_WIDE
+
+
+class NineWanLiPluginMV2(_GRText2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLTIi")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS_WIDE
+
+
+class NineWanLiPluginMV2_1(_GRImage2Image):
+    MODEL = _dec("Im5hbm8tYmFuYW5hLTIi")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = _GR_ASPECTS_WIDE
+
+
+NODE_CLASS_MAPPINGS.update({
+    "NineWanLiPluginM1": NineWanLiPluginM1,
+    "NineWanLiPluginM1_1": NineWanLiPluginM1_1,
+    "NineWanLiPluginM3": NineWanLiPluginM3,
+    "NineWanLiPluginM3_1": NineWanLiPluginM3_1,
+    "NineWanLiPluginM4": NineWanLiPluginM4,
+    "NineWanLiPluginM4_1": NineWanLiPluginM4_1,
+    "NineWanLiPluginM5": NineWanLiPluginM5,
+    "NineWanLiPluginM5_1": NineWanLiPluginM5_1,
+    "NineWanLiPluginM6": NineWanLiPluginM6,
+    "NineWanLiPluginM6_1": NineWanLiPluginM6_1,
+    "NineWanLiPluginMV2": NineWanLiPluginMV2,
+    "NineWanLiPluginMV2_1": NineWanLiPluginMV2_1,
+})
+
+NODE_DISPLAY_NAME_MAPPINGS.update({
+    "NineWanLiPluginM1": "咪咪1",
+    "NineWanLiPluginM1_1": "咪咪1.1",
+    "NineWanLiPluginM3": "咪咪3",
+    "NineWanLiPluginM3_1": "咪咪3.1",
+    "NineWanLiPluginM4": "咪咪4",
+    "NineWanLiPluginM4_1": "咪咪4.1",
+    "NineWanLiPluginM5": "咪咪5",
+    "NineWanLiPluginM5_1": "咪咪5.1",
+    "NineWanLiPluginM6": "咪咪6",
+    "NineWanLiPluginM6_1": "咪咪6.1",
+    "NineWanLiPluginMV2": "咪咪V2",
+    "NineWanLiPluginMV2_1": "咪咪V2.1",
+})
+
+for _cls in [NineWanLiPluginM1, NineWanLiPluginM1_1, NineWanLiPluginM3, NineWanLiPluginM3_1,
+             NineWanLiPluginM4, NineWanLiPluginM4_1, NineWanLiPluginM5, NineWanLiPluginM5_1,
+             NineWanLiPluginM6, NineWanLiPluginM6_1, NineWanLiPluginMV2, NineWanLiPluginMV2_1]:
     _cls.NODE_NAME = NODE_DISPLAY_NAME_MAPPINGS.get(_cls.__name__, _cls.__name__)
