@@ -834,7 +834,7 @@ def _sm_edits(model, prompt, size, ref_items, api_key, seed=-1, timeout=240):
     return _img_edits(_BASE_URL, model, prompt, size, None, ref_items, api_key, seed=seed, timeout=timeout, response_format=None)
 
 
-_MJ_ASPECTS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "4:5", "5:4"]
+_MJ_ASPECTS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "4:5", "5:4"]
 _MJ_ASPECTS_EDIT = ["auto"] + _MJ_ASPECTS
 
 
@@ -854,7 +854,7 @@ def _mj_nearest(w, h):
     return best
 
 
-def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality=None, no="", iw=None):
+def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality="4", no="", iw=None):
     p = prompt or ""
     if aspect and aspect != "auto":
         p += _dec("IC0tYXIg") + aspect
@@ -1236,7 +1236,6 @@ class _MJText2Image:
     ASPECTS = _MJ_ASPECTS
     ASPECTS_EDIT = _MJ_ASPECTS_EDIT
     ASPECT_DEFAULT = "1:1"
-    QUALITY_CHOICES = ["不设置", "0.25", "0.5", "1", "2", "4"]
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -1246,15 +1245,14 @@ class _MJText2Image:
                 "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
                 "aspect": (cls.ASPECTS, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"}),
                 "chaos": ("INT", {"default": 0, "min": 0, "max": 100, "step": 5, "display": "混乱度", "tooltip": "随机性强度，0 最稳定"}),
-                "quality": (cls.QUALITY_CHOICES, {"default": "不设置", "display": "质量"}),
-                "no": ("STRING", {"default": "", "multiline": False, "display": "排除元素", "tooltip": "不希望出现在图中的内容，用逗号分隔"}),
+                "no": ("STRING", {"default": "", "multiline": True, "display": "负面提示词", "tooltip": "不希望出现在图中的内容，用逗号分隔"}),
                 "stylize": ("INT", {"default": 100, "min": 0, "max": 1000, "step": 10, "display": "风格化"}),
                 "seed": _seed_widget(),
             },
         }
 
-    def generate(self, api_key, prompt, aspect, chaos, quality, no, stylize, seed=-1):
-        p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, quality=quality, no=no)
+    def generate(self, api_key, prompt, aspect, chaos, no, stylize, seed=-1):
+        p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, no=no)
         tensors = _mj_generate(p, api_key)
         return (_pack_output(tensors),)
 
@@ -1276,19 +1274,19 @@ class _MJImage2Image(_MJText2Image):
             optional["image_%d" % i] = ("IMAGE", {"display": "图%d" % i})
         return {"required": required, "optional": optional}
 
-    def generate(self, api_key, aspect, chaos, quality, no, stylize, seed=-1, iw=-1.0, prompt="", **kwargs):
+    def generate(self, api_key, aspect, chaos, no, stylize, seed=-1, iw=-1.0, prompt="", **kwargs):
         imgs = [kwargs.get(k) for k in _IMAGE_KEYS]
         slots = {i + 1: imgs[i] for i in range(10) if imgs[i] is not None}
         if not slots:
             if aspect == "auto":
                 aspect = "1:1"
-            p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, quality=quality, no=no)
+            p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, no=no)
             tensors = _mj_generate(p, api_key)
         else:
             w, h = _ref_size(next(iter(slots.values())))
             if aspect == "auto":
                 aspect = _mj_nearest(w, h)
-            p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, quality=quality, no=no, iw=iw)
+            p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, no=no, iw=iw)
             ref_items = [(n, _img_tensor_to_bytes(val)[0]) for n, val in sorted(slots.items())]
             tensors = _mj_edits(p, ref_items, api_key)
         return (_pack_output(tensors),)
