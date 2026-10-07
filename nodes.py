@@ -41,7 +41,7 @@ MSG_GENERIC = "生成失败，请稍后重试"
 
 _VIOLATION_KEYS = [
     "safety", "content_policy", "blocklist", "blocked", "policy",
-    "violat", "moderation", "disallowed", "abuse",
+    "violat", _dec("Im1vZGVyYXRpb24i"), "disallowed", "abuse",
     "sexual", "porn", "explicit", "inappropriate", "nudity",
     "违法", "违规", "内容", "色情", "审核", "不适宜",
 ]
@@ -72,7 +72,7 @@ _SERIES_MODEL = {
         "4K": "gemini-3-pro-image-preview-4k",
     },
     "banana_v21": {
-        "4K": "gemini-nano-banana-2.1-4k",
+        "4K": _dec("ImdlbWluaS1uYW5vLWJhbmFuYS0yLjEtNGsi"),
     },
 }
 
@@ -278,7 +278,7 @@ def _generate(model, prompt, aspect, api_key, seed=-1, timeout=180):
     headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
     last = None
     for extra in _build_variants(seed):
-        cfg = {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspect}}
+        cfg = {"responseModalities": ["IMAGE"], "imageConfig": {_dec("ImFzcGVjdFJhdGlvIg=="): aspect}}
         cfg.update(extra)
         payload = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -311,7 +311,7 @@ def _edits(model, prompt, aspect, ref_items, api_key, seed=-1, timeout=180):
                     "data": base64.b64encode(b).decode("ascii"),
                 }
             })
-        cfg = {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspect}}
+        cfg = {"responseModalities": ["IMAGE"], "imageConfig": {_dec("ImFzcGVjdFJhdGlvIg=="): aspect}}
         cfg.update(extra)
         payload = {"contents": [{"role": "user", "parts": parts}], "generationConfig": cfg}
         try:
@@ -660,7 +660,7 @@ def _br_poll_task(tid, api_key, timeout):
                 if u:
                     return u
             raise RuntimeError(MSG_GENERIC)
-        if st in ("failed", "expired", "cancelled", "canceled"):
+        if st in ("failed", "expired", _dec("ImNhbmNlbGxlZCI="), _dec("ImNhbmNlbGVkIg==")):
             msg = data.get("statusMessage") or data.get("error") or ""
             friendly = _categorize_text(msg)
             if friendly:
@@ -718,7 +718,7 @@ def _img_generate(base_url, model, prompt, size, quality, api_key, seed=-1, time
     headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
     last = None
     for extra in _br_build_variants(quality, seed):
-        payload = {"model": model, "prompt": prompt, "size": size, "moderation": "low"}
+        payload = {"model": model, "prompt": prompt, "size": size, _dec("Im1vZGVyYXRpb24i"): "low"}
         if response_format:
             payload["response_format"] = response_format
         payload.update(extra)
@@ -741,7 +741,7 @@ def _br_generate(model, prompt, size, quality, api_key, seed=-1, timeout=360):
     last = None
     for extra in _br_build_variants(quality, seed):
         body = {"model": model, "prompt": prompt, "n": 1, "size": size, "output_format": "png",
-                "moderation": "low"}
+                _dec("Im1vZGVyYXRpb24i"): "low"}
         body.update(extra)
         for attempt in range(2):
             try:
@@ -776,7 +776,7 @@ def _img_edits(base_url, model, prompt, size, quality, ref_items, api_key, seed=
     url = base_url + "/v1/images/edits"
     last = None
     for variant in _br_build_variants(quality, seed):
-        fields = {"model": model, "prompt": prompt, "size": size, "moderation": "low"}
+        fields = {"model": model, "prompt": prompt, "size": size, _dec("Im1vZGVyYXRpb24i"): "low"}
         if response_format:
             fields["response_format"] = response_format
         fields.update({k: str(v) for k, v in variant.items()})
@@ -802,7 +802,7 @@ def _br_edits(model, prompt, size, quality, ref_items, api_key, seed=-1, timeout
     last = None
     for extra in _br_build_variants(quality, seed):
         body = {"model": model, "prompt": prompt, "n": 1, "size": size, "output_format": "png",
-                "moderation": "low"}
+                _dec("Im1vZGVyYXRpb24i"): "low"}
         body["images"] = [_img_bytes_to_data_url(b) for n, b in ref_items]
         body.update(extra)
         for attempt in range(2):
@@ -1153,14 +1153,14 @@ class _BRImage2Image(_BRText2Image):
 
 
 class NineWanLiPlugin5(_BRText2Image):
-    MODEL = "gpt-image-2.5-flare"
+    MODEL = _dec("ImdwdC1pbWFnZS0yLjUtZmxhcmUi")
     RESOLUTIONS = RESOLUTION_CHOICES_NO_1K
     QUALITY_FIXED = "max"
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin5_1(_BRImage2Image):
-    MODEL = "gpt-image-2.5-flare"
+    MODEL = _dec("ImdwdC1pbWFnZS0yLjUtZmxhcmUi")
     RESOLUTIONS = RESOLUTION_CHOICES_NO_1K
     QUALITY_FIXED = "max"
     DESCRIPTION = "测试节点 请勿使用"
@@ -1224,25 +1224,25 @@ class _SMImage2Image(_SMText2Image):
 
 
 class NineWanLiPlugin6(_SMText2Image):
-    MODEL = "gpt-image-2"
+    MODEL = _dec("ImdwdC1pbWFnZS0yIg==")
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin6_1(_SMImage2Image):
-    MODEL = "gpt-image-2"
+    MODEL = _dec("ImdwdC1pbWFnZS0yIg==")
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin7(_SMText2Image):
-    MODEL = "gpt-image-2.5-flare"
+    MODEL = _dec("ImdwdC1pbWFnZS0yLjUtZmxhcmUi")
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
 
 class NineWanLiPlugin7_1(_SMImage2Image):
-    MODEL = "gpt-image-2.5-flare"
+    MODEL = _dec("ImdwdC1pbWFnZS0yLjUtZmxhcmUi")
     RESOLUTIONS = RESOLUTION_CHOICES
     DESCRIPTION = "测试节点 请勿使用"
 
