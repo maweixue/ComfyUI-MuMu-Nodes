@@ -864,7 +864,7 @@ def _int_or(v, d):
 
 
 def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality="4", no="", iw=None):
-    p = prompt or ""
+    p = (prompt or "")[:900]
     if aspect and aspect != "auto":
         p += _dec("IC0tYXIg") + aspect
     if stylize is not None and str(stylize).strip() != "不设置":
@@ -872,6 +872,7 @@ def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality="4", no="", iw
     if seed is not None and str(seed).strip() and str(seed).strip() != "不设置":
         sd = _int_or(seed, -1)
         if sd >= 0:
+            sd &= 0xFFFFFFFF
             p += _dec("IC0tc2VlZCA=") + str(sd)
     if chaos is not None and str(chaos).strip() and str(chaos).strip() != "不设置":
         c = _int_or(chaos, 0)
