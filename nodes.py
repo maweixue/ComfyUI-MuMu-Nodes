@@ -71,6 +71,9 @@ _SERIES_MODEL = {
         "2K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctMms="),
         "4K": _dec("Z2VtaW5pLTMtcHJvLWltYWdlLXByZXZpZXctNGs="),
     },
+    _dec("YmFuYW5hX3YyMQ=="): {
+        "4K": _dec("Z2VtaW5pLW5hbm8tYmFuYW5hLTIuMS00aw=="),
+    },
 }
 
 _BR_BASE_URL = _dec("aHR0cHM6Ly9hcGkuYmFuYW5hcm91dGVyLmNvbQ==")
@@ -99,7 +102,8 @@ _IMAGE_KEYS = ["image_%d" % i for i in range(1, 11)]
 
 
 def _resolve_model(series, resolution):
-    return _SERIES_MODEL[series].get(resolution, _SERIES_MODEL[series]["1K"])
+    table = _SERIES_MODEL[series]
+    return table.get(resolution) or table.get("1K") or next(iter(table.values()))
 
 
 def _extract_api_message(raw_bytes, fallback_text):
@@ -357,6 +361,10 @@ class _Text2Image:
     FUNCTION = "generate"
     CATEGORY = CATEGORY
     SERIES = _dec("YmFuYW5hX3Yy")
+    RESOLUTIONS = RESOLUTION_CHOICES
+    ASPECTS = BANANA_ASPECT_CHOICES
+    ASPECTS_EDIT = BANANA_ASPECT_CHOICES_EDIT
+    ASPECT_DEFAULT = "1:1"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -364,8 +372,8 @@ class _Text2Image:
             "required": {
                 "api_key": ("STRING", {"default": "", "multiline": False, "display": "密钥"}),
                 "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
-                "resolution": (RESOLUTION_CHOICES, {"default": "1K", "display": "分辨率"}),
-                "aspect": (BANANA_ASPECT_CHOICES, {"default": "1:1", "display": "宽高比"}),
+                "resolution": (cls.RESOLUTIONS, {"default": cls.RESOLUTIONS[0], "display": "分辨率"}),
+                "aspect": (cls.ASPECTS, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"}),
                 "seed": _seed_widget(),
             },
         }
@@ -381,7 +389,7 @@ class _Image2Image(_Text2Image):
     def INPUT_TYPES(cls):
         base = super().INPUT_TYPES()
         required = {k: v for k, v in base["required"].items() if k != "prompt"}
-        required["aspect"] = (BANANA_ASPECT_CHOICES_EDIT, {"default": "1:1", "display": "宽高比"})
+        required["aspect"] = (cls.ASPECTS_EDIT, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"})
         optional = {
             "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
         }
@@ -420,6 +428,18 @@ class NineWanLiPlugin3(_Text2Image):
 
 class NineWanLiPlugin3_1(_Image2Image):
     SERIES = _dec("YmFuYW5hX3Bybw==")
+    DESCRIPTION = "测试节点 请勿使用"
+
+
+class NineWanLiPluginV2(_Text2Image):
+    SERIES = _dec("YmFuYW5hX3YyMQ==")
+    RESOLUTIONS = ["4K"]
+    DESCRIPTION = "测试节点 请勿使用"
+
+
+class NineWanLiPluginV2_1(_Image2Image):
+    SERIES = _dec("YmFuYW5hX3YyMQ==")
+    RESOLUTIONS = ["4K"]
     DESCRIPTION = "测试节点 请勿使用"
 
 
@@ -1042,6 +1062,8 @@ NODE_CLASS_MAPPINGS = {
     "NineWanLiPlugin6_1": NineWanLiPlugin6_1,
     "NineWanLiPlugin7": NineWanLiPlugin7,
     "NineWanLiPlugin7_1": NineWanLiPlugin7_1,
+    "NineWanLiPluginV2": NineWanLiPluginV2,
+    "NineWanLiPluginV2_1": NineWanLiPluginV2_1,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1055,9 +1077,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NineWanLiPlugin6_1": "木木4.1-备用",
     "NineWanLiPlugin7": "木木5-备用",
     "NineWanLiPlugin7_1": "木木5.1-备用",
+    "NineWanLiPluginV2": "木木V2",
+    "NineWanLiPluginV2_1": "木木V2.1",
 }
 
 for _cls in [NineWanLiPlugin2, NineWanLiPlugin2_1, NineWanLiPlugin3, NineWanLiPlugin3_1,
              NineWanLiPlugin5, NineWanLiPlugin5_1, NineWanLiPlugin6, NineWanLiPlugin6_1,
-             NineWanLiPlugin7, NineWanLiPlugin7_1]:
+             NineWanLiPlugin7, NineWanLiPlugin7_1, NineWanLiPluginV2, NineWanLiPluginV2_1]:
     _cls.NODE_NAME = NODE_DISPLAY_NAME_MAPPINGS.get(_cls.__name__, _cls.__name__)
