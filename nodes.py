@@ -834,6 +834,183 @@ def _sm_edits(model, prompt, size, ref_items, api_key, seed=-1, timeout=240):
     return _img_edits(_BASE_URL, model, prompt, size, None, ref_items, api_key, seed=seed, timeout=timeout, response_format=None)
 
 
+_MJ_ASPECTS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "4:5", "5:4"]
+_MJ_ASPECTS_EDIT = ["auto"] + _MJ_ASPECTS
+
+
+def _mj_nearest(w, h):
+    w, h = int(w), int(h)
+    if h <= 0:
+        return "1:1"
+    best = _MJ_ASPECTS[0]
+    bd = 1e18
+    r = w / float(h)
+    for a in _MJ_ASPECTS:
+        aw, ah = map(int, a.split(":"))
+        d = abs(r - aw / float(ah))
+        if d < bd:
+            bd = d
+            best = a
+    return best
+
+
+def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality=None, no="", iw=None):
+    p = prompt or ""
+    if aspect and aspect != "auto":
+        p += _dec("IC0tYXIg") + aspect
+    if stylize is not None:
+        p += _dec("IC0tc3R5bGl6ZSA=") + str(int(stylize))
+    if seed is not None and int(seed) >= 0:
+        p += _dec("IC0tc2VlZCA=") + str(int(seed))
+    if chaos is not None and int(chaos) > 0:
+        p += _dec("IC0tY2hhb3Mg") + str(int(chaos))
+    if quality and quality != "不设置":
+        p += _dec("IC0tcSA=") + quality
+    if no and str(no).strip():
+        p += _dec("IC0tbm8g") + str(no).strip()
+    if iw is not None and float(iw) >= 0:
+        p += _dec("IC0taXcg") + str(float(iw))
+    return p
+
+
+def _mj_submit(prompt, api_key, ref_b64=None):
+    url = _BR_BASE_URL + _dec("L21qL3N1Ym1pdC9pbWFnaW5l")
+    headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
+    body = {"model": _dec("bWlkam91cm5leQ=="), "prompt": prompt}
+    if ref_b64:
+        body[_dec("YmFzZTY0QXJyYXk=")] = ref_b64
+    try:
+        raw = _request(url, json.dumps(body).encode("utf-8"), headers, 30)
+    except _ReadError:
+        raise
+    except RuntimeError:
+        raise
+    try:
+        obj = json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise RuntimeError(MSG_GENERIC)
+    tid = obj.get("result")
+    if not tid:
+        raise RuntimeError(MSG_GENERIC)
+    return tid
+
+
+def _mj_poll(tid, api_key, timeout):
+    url = _BR_BASE_URL + _dec("L21qL3Rhc2sv") + tid + "/fetch"
+    headers = {"Authorization": "Bearer " + api_key}
+    deadline = time.time() + timeout
+    while True:
+        remain = deadline - time.time()
+        if remain <= 0:
+            raise RuntimeError(MSG_TIMEOUT)
+        try:
+            raw = _request(url, None, headers, min(15, max(5, remain)), method="GET")
+        except Exception:
+            time.sleep(5)
+            continue
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            time.sleep(5)
+            continue
+        st = data.get("status")
+        if st == "SUCCESS":
+            urls = [it.get("url") for it in (data.get("imageUrls") or []) if it.get("url")]
+            if urls:
+                return urls
+            raise RuntimeError(MSG_GENERIC)
+        if st in ("FAILURE", "EXPIRED", "CANCELLED", "CANCELED"):
+            msg = data.get("failReason") or data.get("error") or ""
+            friendly = _categorize_text(msg)
+            if friendly:
+                raise RuntimeError(friendly)
+            if msg:
+                raise RuntimeError(MSG_GENERIC + "（" + str(msg).strip()[:100] + "）")
+            raise RuntimeError(MSG_GENERIC)
+        time.sleep(5)
+
+
+def _mj_fetch_images(urls, timeout):
+    outs = [None] * len(urls)
+    def _w(i):
+        outs[i] = _br_fetch_image(urls[i], timeout)
+    threads = [threading.Thread(target=_w, args=(i,)) for i in range(len(urls))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if any(o is None for o in outs):
+        raise RuntimeError(MSG_GENERIC)
+    return [_bytes_to_img_tensor(o) for o in outs]
+
+
+def _mj_generate(prompt, api_key, timeout=360, max_count=0):
+    last = None
+    for attempt in range(2):
+        try:
+            tid = _mj_submit(prompt, api_key)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            break
+        try:
+            urls = _mj_poll(tid, api_key, timeout)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            continue
+        if max_count and max_count > 0:
+            urls = urls[:max_count]
+        try:
+            return _mj_fetch_images(urls, 240)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            last = e
+            continue
+    raise last if last else RuntimeError(MSG_GENERIC)
+
+
+def _mj_edits(prompt, ref_items, api_key, timeout=360, max_count=0):
+    ref_b64 = [base64.b64encode(_compress(b)).decode("ascii") for n, b in ref_items]
+    last = None
+    for attempt in range(2):
+        try:
+            tid = _mj_submit(prompt, api_key, ref_b64=ref_b64)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            break
+        try:
+            urls = _mj_poll(tid, api_key, timeout)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                raise
+            last = e
+            continue
+        if max_count and max_count > 0:
+            urls = urls[:max_count]
+        try:
+            return _mj_fetch_images(urls, 240)
+        except _ReadError:
+            raise
+        except RuntimeError as e:
+            last = e
+            continue
+    raise last if last else RuntimeError(MSG_GENERIC)
+
+
 def _ref_size(t):
     s = list(t.shape)
     if len(s) == 4:
@@ -1051,6 +1228,80 @@ class NineWanLiPlugin7_1(_SMImage2Image):
     DESCRIPTION = "测试节点 请勿使用"
 
 
+class _MJText2Image:
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("图片",)
+    FUNCTION = "generate"
+    CATEGORY = CATEGORY
+    ASPECTS = _MJ_ASPECTS
+    ASPECTS_EDIT = _MJ_ASPECTS_EDIT
+    ASPECT_DEFAULT = "1:1"
+    QUALITY_CHOICES = ["不设置", "0.25", "0.5", "1", "2", "4"]
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "api_key": ("STRING", {"default": "", "multiline": False, "display": "密钥"}),
+                "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
+                "aspect": (cls.ASPECTS, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"}),
+                "chaos": ("INT", {"default": 0, "min": 0, "max": 100, "step": 5, "display": "混乱度", "tooltip": "随机性强度，0 最稳定"}),
+                "quality": (cls.QUALITY_CHOICES, {"default": "不设置", "display": "质量"}),
+                "no": ("STRING", {"default": "", "multiline": False, "display": "排除元素", "tooltip": "不希望出现在图中的内容，用逗号分隔"}),
+                "stylize": ("INT", {"default": 100, "min": 0, "max": 1000, "step": 10, "display": "风格化"}),
+                "seed": _seed_widget(),
+            },
+        }
+
+    def generate(self, api_key, prompt, aspect, chaos, quality, no, stylize, seed=-1):
+        p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, quality=quality, no=no)
+        tensors = _mj_generate(p, api_key)
+        return (_pack_output(tensors),)
+
+
+class _MJImage2Image(_MJText2Image):
+    @classmethod
+    def INPUT_TYPES(cls):
+        base = super().INPUT_TYPES()
+        required = {}
+        for k, v in base["required"].items():
+            if k != "prompt":
+                required[k] = v
+        required["aspect"] = (cls.ASPECTS_EDIT, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"})
+        required["iw"] = ("FLOAT", {"default": -1.0, "min": 0.0, "max": 3.0, "step": 0.1, "display": "参考权重", "tooltip": "参考图影响强度，0 完全忽略参考图，3 最大影响"})
+        optional = {
+            "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
+        }
+        for i in range(1, 11):
+            optional["image_%d" % i] = ("IMAGE", {"display": "图%d" % i})
+        return {"required": required, "optional": optional}
+
+    def generate(self, api_key, aspect, chaos, quality, no, stylize, seed=-1, iw=-1.0, prompt="", **kwargs):
+        imgs = [kwargs.get(k) for k in _IMAGE_KEYS]
+        slots = {i + 1: imgs[i] for i in range(10) if imgs[i] is not None}
+        if not slots:
+            if aspect == "auto":
+                aspect = "1:1"
+            p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, quality=quality, no=no)
+            tensors = _mj_generate(p, api_key)
+        else:
+            w, h = _ref_size(next(iter(slots.values())))
+            if aspect == "auto":
+                aspect = _mj_nearest(w, h)
+            p = _mj_prompt(prompt, aspect, stylize, seed, chaos=chaos, quality=quality, no=no, iw=iw)
+            ref_items = [(n, _img_tensor_to_bytes(val)[0]) for n, val in sorted(slots.items())]
+            tensors = _mj_edits(p, ref_items, api_key)
+        return (_pack_output(tensors),)
+
+
+class NineWanLiPluginV8(_MJText2Image):
+    DESCRIPTION = "测试节点 请勿使用"
+
+
+class NineWanLiPluginV8_1(_MJImage2Image):
+    DESCRIPTION = "测试节点 请勿使用"
+
+
 NODE_CLASS_MAPPINGS = {
     "NineWanLiPlugin2": NineWanLiPlugin2,
     "NineWanLiPlugin2_1": NineWanLiPlugin2_1,
@@ -1064,6 +1315,8 @@ NODE_CLASS_MAPPINGS = {
     "NineWanLiPlugin7_1": NineWanLiPlugin7_1,
     "NineWanLiPluginV2": NineWanLiPluginV2,
     "NineWanLiPluginV2_1": NineWanLiPluginV2_1,
+    "NineWanLiPluginV8": NineWanLiPluginV8,
+    "NineWanLiPluginV8_1": NineWanLiPluginV8_1,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1079,9 +1332,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NineWanLiPlugin7_1": "木木5.1-备用",
     "NineWanLiPluginV2": "木木V2",
     "NineWanLiPluginV2_1": "木木V2.1",
+    "NineWanLiPluginV8": "南南V8",
+    "NineWanLiPluginV8_1": "南南V8.1",
 }
 
 for _cls in [NineWanLiPlugin2, NineWanLiPlugin2_1, NineWanLiPlugin3, NineWanLiPlugin3_1,
              NineWanLiPlugin5, NineWanLiPlugin5_1, NineWanLiPlugin6, NineWanLiPlugin6_1,
-             NineWanLiPlugin7, NineWanLiPlugin7_1, NineWanLiPluginV2, NineWanLiPluginV2_1]:
+             NineWanLiPlugin7, NineWanLiPlugin7_1, NineWanLiPluginV2, NineWanLiPluginV2_1,
+             NineWanLiPluginV8, NineWanLiPluginV8_1]:
     _cls.NODE_NAME = NODE_DISPLAY_NAME_MAPPINGS.get(_cls.__name__, _cls.__name__)
