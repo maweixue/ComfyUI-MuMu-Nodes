@@ -307,8 +307,8 @@ def _edits(model, prompt, aspect, ref_items, api_key, seed=-1, timeout=180):
             parts.append({"text": "图%d" % n})
             parts.append({
                 "inlineData": {
-                    "mimeType": "image/jpeg",
-                    "data": base64.b64encode(_compress(b)).decode("ascii"),
+                    "mimeType": "image/png",
+                    "data": base64.b64encode(b).decode("ascii"),
                 }
             })
         cfg = {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspect}}
@@ -453,7 +453,7 @@ def _br_multipart(fields, files):
     for k, v in fields.items():
         buf.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + k + "\"\r\n\r\n" + str(v) + "\r\n").encode("utf-8"))
     for fname, fbytes in files:
-        buf.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"image[]\"; filename=\"" + fname + "\"\r\nContent-Type: image/jpeg\r\n\r\n").encode("utf-8"))
+        buf.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"image[]\"; filename=\"" + fname + "\"\r\nContent-Type: image/png\r\n\r\n").encode("utf-8"))
         buf.write(fbytes)
         buf.write(b"\r\n")
     buf.write(("--" + boundary + "--\r\n").encode("utf-8"))
@@ -680,7 +680,7 @@ def _br_cancel(tid, api_key):
 
 
 def _img_bytes_to_data_url(b):
-    return "data:image/jpeg;base64," + base64.b64encode(b).decode("ascii")
+    return "data:image/png;base64," + base64.b64encode(b).decode("ascii")
 
 
 def _br_download_retry(url, timeout):
@@ -780,7 +780,7 @@ def _img_edits(base_url, model, prompt, size, quality, ref_items, api_key, seed=
         if response_format:
             fields["response_format"] = response_format
         fields.update({k: str(v) for k, v in variant.items()})
-        files = [("img%d.jpg" % n, _compress(b)) for n, b in ref_items]
+        files = [("img%d.png" % n, b) for n, b in ref_items]
         boundary, body = _br_multipart(fields, files)
         headers = {"Authorization": "Bearer " + api_key, "Content-Type": "multipart/form-data; boundary=" + boundary}
         try:
@@ -803,7 +803,7 @@ def _br_edits(model, prompt, size, quality, ref_items, api_key, seed=-1, timeout
     for extra in _br_build_variants(quality, seed):
         body = {"model": model, "prompt": prompt, "n": 1, "size": size, "output_format": "png",
                 "moderation": "low"}
-        body["images"] = [_img_bytes_to_data_url(_compress(b)) for n, b in ref_items]
+        body["images"] = [_img_bytes_to_data_url(b) for n, b in ref_items]
         body.update(extra)
         for attempt in range(2):
             try:
@@ -854,22 +854,40 @@ def _mj_nearest(w, h):
     return best
 
 
+def _int_or(v, d):
+    try:
+        if v in (None, ""):
+            return d
+        return int(v)
+    except Exception:
+        return d
+
+
 def _mj_prompt(prompt, aspect, stylize, seed, chaos=None, quality="4", no="", iw=None):
     p = prompt or ""
     if aspect and aspect != "auto":
         p += _dec("IC0tYXIg") + aspect
-    if stylize is not None:
-        p += _dec("IC0tc3R5bGl6ZSA=") + str(int(stylize))
-    if seed is not None and int(seed) >= 0:
-        p += _dec("IC0tc2VlZCA=") + str(int(seed))
-    if chaos is not None and int(chaos) > 0:
-        p += _dec("IC0tY2hhb3Mg") + str(int(chaos))
+    if stylize is not None and str(stylize).strip() != "不设置":
+        p += _dec("IC0tc3R5bGl6ZSA=") + str(_int_or(stylize, 100))
+    if seed is not None and str(seed).strip() and str(seed).strip() != "不设置":
+        sd = _int_or(seed, -1)
+        if sd >= 0:
+            p += _dec("IC0tc2VlZCA=") + str(sd)
+    if chaos is not None and str(chaos).strip() and str(chaos).strip() != "不设置":
+        c = _int_or(chaos, 0)
+        if c > 0:
+            p += _dec("IC0tY2hhb3Mg") + str(c)
     if quality and quality != "不设置":
         p += _dec("IC0tcSA=") + quality
-    if no and str(no).strip():
+    if no and str(no).strip() and str(no).strip() != "不设置":
         p += _dec("IC0tbm8g") + str(no).strip()
-    if iw is not None and float(iw) >= 0:
-        p += _dec("IC0taXcg") + str(float(iw))
+    if iw is not None and str(iw).strip() and str(iw).strip() != "不设置":
+        try:
+            f = float(iw)
+            if f >= 0:
+                p += _dec("IC0taXcg") + str(f)
+        except Exception:
+            pass
     return p
 
 
@@ -978,7 +996,7 @@ def _mj_generate(prompt, api_key, timeout=360, max_count=0):
 
 
 def _mj_edits(prompt, ref_items, api_key, timeout=360, max_count=0):
-    ref_b64 = [base64.b64encode(_compress(b)).decode("ascii") for n, b in ref_items]
+    ref_b64 = [base64.b64encode(b).decode("ascii") for n, b in ref_items]
     last = None
     for attempt in range(2):
         try:
@@ -1244,9 +1262,9 @@ class _MJText2Image:
                 "api_key": ("STRING", {"default": "", "multiline": False, "display": "密钥"}),
                 "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
                 "aspect": (cls.ASPECTS, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"}),
-                "chaos": ("INT", {"default": 0, "min": 0, "max": 100, "step": 5, "display": "混乱度", "tooltip": "随机性强度，0 最稳定"}),
+                "chaos": ("STRING", {"default": "0", "display": "混乱度", "tooltip": "随机性强度，0 最稳定"}),
                 "no": ("STRING", {"default": "", "multiline": True, "display": "负面提示词", "tooltip": "不希望出现在图中的内容，用逗号分隔"}),
-                "stylize": ("INT", {"default": 100, "min": 0, "max": 1000, "step": 10, "display": "风格化"}),
+                "stylize": ("STRING", {"default": "100", "display": "风格化"}),
                 "seed": _seed_widget(),
             },
         }
@@ -1266,7 +1284,7 @@ class _MJImage2Image(_MJText2Image):
             if k != "prompt":
                 required[k] = v
         required["aspect"] = (cls.ASPECTS_EDIT, {"default": cls.ASPECT_DEFAULT, "display": "宽高比"})
-        required["iw"] = ("FLOAT", {"default": -1.0, "min": 0.0, "max": 3.0, "step": 0.1, "display": "参考权重", "tooltip": "参考图影响强度，0 完全忽略参考图，3 最大影响"})
+        required["iw"] = ("STRING", {"default": "-1", "display": "参考权重", "tooltip": "参考图影响强度，0 完全忽略参考图，3 最大影响"})
         optional = {
             "prompt": ("STRING", {"default": "", "multiline": True, "display": "提示词"}),
         }
@@ -1300,6 +1318,69 @@ class NineWanLiPluginV8_1(_MJImage2Image):
     DESCRIPTION = "测试节点 请勿使用"
 
 
+class NineWanLiPlugin5_6:
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("文本",)
+    FUNCTION = "generate"
+    CATEGORY = CATEGORY
+    DESCRIPTION = "测试节点 请勿使用"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        optional = {
+            "prompt": ("STRING", {"default": "", "multiline": True, "display": "提问"}),
+        }
+        for i in range(1, 11):
+            optional["image_%d" % i] = ("IMAGE", {"display": "图%d" % i})
+        return {
+            "required": {
+                "api_key": ("STRING", {"default": "", "multiline": False, "display": "密钥"}),
+            },
+            "optional": optional,
+        }
+
+    def generate(self, api_key, prompt="", **kwargs):
+        imgs = [kwargs.get(k) for k in _IMAGE_KEYS]
+        slots = {i + 1: imgs[i] for i in range(10) if imgs[i] is not None}
+        if slots:
+            parts = [{"type": "text", "text": prompt or ""}]
+            for n, val in sorted(slots.items()):
+                b = _img_tensor_to_bytes(val)[0]
+                parts.append({"type": "image_url", "image_url": {"url": "data:image/png;base64," + base64.b64encode(b).decode("ascii")}})
+            content = parts
+        else:
+            content = prompt or ""
+        url = _BR_BASE_URL + _dec("L3YxL2NoYXQvY29tcGxldGlvbnM=")
+        headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json"}
+        body = {
+            "model": _dec("Z3B0LTUuNi1sdW5h"),
+            "messages": [{"role": "user", "content": content}],
+            "temperature": 0.6,
+            "max_completion_tokens": 4096,
+            "top_p": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+        }
+        last = None
+        for attempt in range(2):
+            try:
+                raw = _request(url, json.dumps(body).encode("utf-8"), headers, 180)
+            except _ReadError:
+                raise
+            except RuntimeError as e:
+                if str(e) in (MSG_VIOLATION, MSG_SIZE_TOO_LARGE):
+                    raise
+                last = e
+                continue
+            try:
+                obj = json.loads(raw.decode("utf-8"))
+                text = obj["choices"][0]["message"]["content"]
+                return (text or "",)
+            except Exception:
+                raise RuntimeError(MSG_GENERIC)
+        raise last if last else RuntimeError(MSG_GENERIC)
+
+
 NODE_CLASS_MAPPINGS = {
     "NineWanLiPlugin2": NineWanLiPlugin2,
     "NineWanLiPlugin2_1": NineWanLiPlugin2_1,
@@ -1315,6 +1396,7 @@ NODE_CLASS_MAPPINGS = {
     "NineWanLiPluginV2_1": NineWanLiPluginV2_1,
     "NineWanLiPluginV8": NineWanLiPluginV8,
     "NineWanLiPluginV8_1": NineWanLiPluginV8_1,
+    "NineWanLiPlugin5_6": NineWanLiPlugin5_6,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1332,10 +1414,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NineWanLiPluginV2_1": "木木V2.1",
     "NineWanLiPluginV8": "南南V8",
     "NineWanLiPluginV8_1": "南南V8.1",
+    "NineWanLiPlugin5_6": "南南5.6",
 }
 
 for _cls in [NineWanLiPlugin2, NineWanLiPlugin2_1, NineWanLiPlugin3, NineWanLiPlugin3_1,
              NineWanLiPlugin5, NineWanLiPlugin5_1, NineWanLiPlugin6, NineWanLiPlugin6_1,
              NineWanLiPlugin7, NineWanLiPlugin7_1, NineWanLiPluginV2, NineWanLiPluginV2_1,
-             NineWanLiPluginV8, NineWanLiPluginV8_1]:
+             NineWanLiPluginV8, NineWanLiPluginV8_1, NineWanLiPlugin5_6]:
     _cls.NODE_NAME = NODE_DISPLAY_NAME_MAPPINGS.get(_cls.__name__, _cls.__name__)
